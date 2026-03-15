@@ -28,6 +28,3 @@ Decision Comparison → Best Signal Applied
 - NumPy
 - Reinforcement Learning
 
-## 👥 Team
-- Member 1: Simulation + Mathematical Model  
-- Member 2: DRL Model + Evaluation
