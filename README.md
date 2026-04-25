@@ -93,6 +93,7 @@ A PyTorch-powered neural network inside `drl_model/`:
 
 ---
 
+<a name="benchmarking-system"></a>
 ## 📊 Benchmarking System
 
 SignalSync uses a reproducible, sequential experiment flow to ensure a scientifically fair comparison:
@@ -171,6 +172,7 @@ SignalSync/
 
 ---
 
+<a name="getting-started"></a>
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -210,6 +212,7 @@ python main.py
 
 ---
 
+<a name="architecture-notes"></a>
 ## 🏗️ Architecture Notes
 
 - **State vector** — `agent.py` observes 12 normalized parameters: queue lengths (×4), cumulative wait times (×4), and instantaneous traffic density (×4) for N/S/E/W
