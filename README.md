@@ -33,24 +33,24 @@ No fixed timers. No guesswork. Just two algorithms competing for the fastest flo
 
 ## 📸 Screenshots
 
-### 🎬 Landing Screen
-> *The SignalSync dashboard with animated grid, pulsing intersection nodes, and floating particles.*
+### ⚙️ Math Model — Live Simulation
+> *Mathematical model running on BALANCED scenario. Traffic Console shows per-lane queue, wait time, and density. Active lane highlighted in green. Progress: 26s / 60s.*
 
-![Landing Screen](./assets/landing.png)
-
----
-
-### 🗺️ Live Simulation View
-> *Real-time vehicle movement, color-coded signal states, and per-lane metrics panel.*
-
-![Simulation View](./assets/simulation.png)
+![Math Model Running](./assets/math_simulation.png)
 
 ---
 
-### 📊 Benchmark Results Dashboard
-> *Head-to-head comparison after both models complete their runs.*
+### 🤖 DRL Agent — Live Simulation
+> *DRL agent takes over under identical traffic conditions. Green progress bar indicates the AI run in progress. South lane currently green with queue clearing.*
 
-![Results Dashboard](./assets/results.png)
+![DRL Agent Running](./assets/drl_simulation.png)
+
+---
+
+### 📊 Simulation Experiment Dashboard
+> *Head-to-head results after both 60s runs. Math model wins on all four metrics — avg wait, max wait, throughput, and queue length — in this benchmark.*
+
+![Results Dashboard](./assets/results_dashboard.png)
 
 ---
 
@@ -62,7 +62,8 @@ No fixed timers. No guesswork. Just two algorithms competing for the fastest flo
 | 📐 | **Mathematical Model** | Weighted scoring + prediction algorithm using real-time queue lengths and vehicle arrivals |
 | 🤖 | **DRL Agent (DQN)** | PyTorch Deep Q-Network observing a 12-parameter intersection state to learn long-term optimization |
 | 🛡️ | **Hybrid Safety Override** | Prevents traffic starvation — steps in if the AI makes dangerously inefficient decisions |
-| 📊 | **Live Metrics Panel** | Real-time queue lengths, density scores, and signal phase tracking across N/S/E/W |
+| 📊 | **Live Traffic Console** | Real-time queue lengths, wait times, and density tracking across N/S/E/W lanes |
+| 🚦 | **Scenario Selector** | Switch between LOW, BALANCED, and PEAK traffic scenarios mid-experiment |
 | ⚗️ | **Fair Benchmarking** | Fixed random seed ensures both models face identical traffic across sequential runs |
 | 🏆 | **Results Dashboard** | Programmatic winner declaration based on avg wait, max wait, throughput, and queue length |
 
@@ -102,16 +103,16 @@ SignalSync uses a reproducible, sequential experiment flow to ensure a scientifi
 ┌──────────────────────────────────────────────────────────────┐
 │                    EXPERIMENT FLOW                           │
 │                                                              │
-│  1. User sets duration (e.g. 60s, 120s)                     │
+│  1. User sets duration (e.g. 60s, 120s)                      │
 │                                                              │
-│  2. Math Model runs → metrics tracked via metrics.py        │
+│  2. Math Model runs → metrics tracked via metrics.py         │
 │       ↓                                                      │
 │  3. Full intersection reset + fixed random seed applied      │
 │       ↓                                                      │
 │  4. DRL Agent runs → same traffic, same seed                 │
 │       ↓                                                      │
-│  5. comparator.py ranks both models across 4 metrics        │
-│     → declares winner on the results dashboard              │
+│  5. comparator.py ranks both models across 4 metrics         │
+│     → declares winner on the results dashboard               │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -167,7 +168,7 @@ SignalSync/
 │   └── metrics.py                # MetricsTracker — wait time, queue, throughput
 │
 └── visualization/                # Rendering layer
-    └── pygame_display.py         # Roads, vehicles, signals, metrics panel
+    └── pygame_display.py         # Roads, vehicles, signals, traffic console
 ```
 
 ---
@@ -202,13 +203,12 @@ python main.py
 
 ### Running a Benchmark
 
-1. Launch `python main.py` — the animated SignalSync landing screen appears
-2. Click **Get Started** to open the configuration panel
-3. Set your simulation **duration** (60s recommended for a first run) and **traffic scenario**
-4. The **Mathematical Model** runs first — watch the live metrics panel update in real time
-5. The intersection **auto-resets** with the same random seed applied
-6. The **DRL Agent** runs under identical conditions
-7. The **Results Dashboard** appears — `comparator.py` ranks both models across all four metrics and declares a winner
+1. Launch `python main.py` — the SignalSync landing screen appears
+2. Click **Get Started** and set your **duration** and **traffic scenario** (LOW / BALANCED / PEAK)
+3. The **Mathematical Model** runs first — the Traffic Console shows live queue, wait, and density per lane with an amber progress bar
+4. The intersection **auto-resets** with the same random seed applied
+5. The **DRL Agent** runs under identical conditions — green progress bar indicates the AI run
+6. The **Simulation Experiment Dashboard** appears — all four metrics compared side-by-side with a final conclusion declaring the winner
 
 ---
 
