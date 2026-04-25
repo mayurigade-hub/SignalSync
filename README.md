@@ -11,10 +11,6 @@
 [![Pygame](https://img.shields.io/badge/Pygame-Simulation-00C853?style=flat-square)](https://pygame.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](./LICENSE)
 
-**SEM 4 Mini Project · Computer Engineering · 2025**
-
-[🚀 Run the Simulation](#-getting-started) · [📐 Architecture](#-architecture-notes) · [📊 How Benchmarking Works](#-benchmarking-system) · [👥 Team](#-team)
-
 </div>
 
 ---
@@ -219,28 +215,6 @@ python main.py
 - **Fixed-seed fairness** — `random.seed()` and `numpy.seed()` are reset to identical values before each model's run, making the vehicle spawn sequence byte-for-byte identical
 - **Pre-trained weights** — `dqn_agent.pth` lets the agent run inference immediately; re-training can be triggered via `train.py`
 - **Decoupled evaluation** — `evaluation/` has zero imports from model internals; `metrics.py` hooks into vehicle lifecycle events only
-
----
-
-## 🗺️ Roadmap
-
-- [ ] Multi-intersection corridor simulation
-- [ ] Full DRL training pipeline with learning curves exported to `results/`
-- [ ] Statistical significance testing across N runs
-- [ ] Export benchmark results as PDF report
-- [ ] SUMO integration for real road network import
-
----
-
-## 👥 Team
-
-**SEM 4 Mini Project · Computer Engineering · 2025**
-
-| Name | GitHub |
-|---|---|
-| Team Member 1 | [@username](https://github.com) |
-| Team Member 2 | [@username](https://github.com) |
-| Team Member 3 | [@username](https://github.com) |
 
 ---
 
