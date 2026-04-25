@@ -1,0 +1,16 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual env
+.venv/
+env/
+
+# Model weights
+*.pth
+
+# Build files
+dist/
+build/
+*.spec
