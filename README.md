@@ -32,21 +32,21 @@ No fixed timers. No guesswork. Just two algorithms competing for the fastest flo
 ### ⚙️ Math Model — Live Simulation
 > *Mathematical model running on BALANCED scenario. Traffic Console shows per-lane queue, wait time, and density. Active lane highlighted in green. Progress: 26s / 60s.*
 
-![Math Model Running](./assets/math_simulation.png)
+![Math Model Running](./assets/Math Model — Live Simulation.png)
 
 ---
 
 ### 🤖 DRL Agent — Live Simulation
 > *DRL agent takes over under identical traffic conditions. Green progress bar indicates the AI run in progress. South lane currently green with queue clearing.*
 
-![DRL Agent Running](./assets/drl_simulation.png)
+![DRL Agent Running](./assets/DRL Agent — Live Simulation.png)
 
 ---
 
 ### 📊 Simulation Experiment Dashboard
 > *Head-to-head results after both 60s runs. Math model wins on all four metrics — avg wait, max wait, throughput, and queue length — in this benchmark.*
 
-![Results Dashboard](./assets/results_dashboard.png)
+![Results Dashboard](./assets/Simulation Experiment Dashboard.png)
 
 ---
 
