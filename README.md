@@ -11,6 +11,8 @@
 [![Pygame](https://img.shields.io/badge/Pygame-Simulation-00C853?style=flat-square)](https://pygame.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](./LICENSE)
 
+🚀 Run the Simulation · 📐 Architecture · 📊 How Benchmarking Works ·
+
 </div>
 
 ---
