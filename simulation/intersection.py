@@ -18,32 +18,44 @@ class TrafficSignalController:
         
         # 1. State machine for Signal transitions
         if not self.is_yellow:
-            # NORMAL switch conditions or SMART early switch
-            can_switch_early = False
-            is_drl_override = False
+            should_switch = False
+            next_dir = None
             
             if scores and stats:
-                is_drl_override = any(s >= 99999 for s in scores.values())
-                curr_queue = stats[self.current_direction]['queue']
+                # Dynamic Smart Mode
+                best_dir = self._select_best_direction(scores, stats)
+                if best_dir != self.current_direction:
+                    # Only switch if min_green_time has elapsed to prevent flickering
+                    if self.timer >= self.min_green_time:
+                        should_switch = True
+                        next_dir = best_dir
                 
-                # Math Mode: Early switch if lane is completely empty AND min_green_time elapsed
-                if not is_drl_override and self.timer >= self.min_green_time and curr_queue == 0:
+                # Also force switch if current lane is empty
+                curr_queue = stats[self.current_direction]['queue']
+                if curr_queue == 0 and self.timer >= self.min_green_time:
                     others_waiting = any(stats[d]['queue'] > 0 for d in self.directions if d != self.current_direction)
                     if others_waiting:
-                        can_switch_early = True
-                        
-            if self.timer >= self.cycle_time or can_switch_early:
+                        should_switch = True
+                        next_dir = best_dir
+            else:
+                # Fallback Fixed-Cycle Mode
+                if self.timer >= self.cycle_time:
+                    should_switch = True
+            
+            if should_switch:
                 self.is_yellow = True
                 self.signal_states[self.current_direction] = 'YELLOW'
                 self.timer = 0
+                if next_dir:
+                    self.next_direction = next_dir
         else:
             if self.timer >= self.yellow_time:
                 self.signal_states[self.current_direction] = 'RED'
                 self.is_yellow = False
                 self.last_direction = self.current_direction
                 
-                if scores and stats:
-                    self.current_direction = self._select_best_direction(scores, stats)
+                if hasattr(self, 'next_direction'):
+                    self.current_direction = self.next_direction
                 else:
                     curr_idx = self.directions.index(self.current_direction)
                     self.current_direction = self.directions[(curr_idx + 1) % len(self.directions)]

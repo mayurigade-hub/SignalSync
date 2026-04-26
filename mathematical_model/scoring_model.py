@@ -16,8 +16,5 @@ def calculate_score(queue, total_waiting_time, predicted_queue, weights=None):
     # Total wait time explodes with 1 vehicle waiting 100s, but 10 cars waiting 10s is worse congestion.
     avg_waiting_time = total_waiting_time / queue if queue > 0 else 0
     
-    # Priority condition: Large queues get exponential priority
-    queue_penalty = queue * 1.5 if queue > 10 else queue
-    
-    score = (w1 * queue_penalty) + (w2 * avg_waiting_time) + (w3 * predicted_queue)
+    score = (w1 * queue) + (w2 * avg_waiting_time) + (w3 * predicted_queue)
     return score

@@ -4,70 +4,99 @@ import numpy as np
 
 class TrafficEnv(gym.Env):
     """
-    Custom Environment for Smart Traffic Signal following Gymnasium interface.
+    Improved Traffic Environment for DQN training.
+    Uses normalized states and a balanced reward function.
     """
     metadata = {"render_modes": ["human"]}
 
     def __init__(self, simulation=None):
         super().__init__()
         self.simulation = simulation
-        
-        # Action space: 0 = North, 1 = South, 2 = East, 3 = West
         self.action_space = spaces.Discrete(4)
         
-        # State: [qN, qS, qE, qW, wN, wS, wE, wW, dN, dS, dE, dW]
-        self.observation_space = spaces.Box(low=0.0, high=np.inf, shape=(12,), dtype=np.float32)
+        # State: [4xQueue, 4xAvgWait, 4xMaxWait, 4xCurrentSignal]
+        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(16,), dtype=np.float32)
         
-        self.state = np.zeros(12, dtype=np.float32)
+        # Internal raw state
+        self.raw_queue = np.zeros(4)
+        self.raw_wait_total = np.zeros(4)
+        self.raw_wait_max = np.zeros(4)
+        self.current_signal = 0 # 0=N, 1=S, 2=E, 3=W
+        self.prev_action = -1
+        self.switching_timer = 0 
+        
+        self.max_queue = 50.0
+        self.max_avg_wait = 60.0
+        self.max_max_wait = 120.0
+
+    def _get_normalized_state(self):
+        norm_q = np.clip(self.raw_queue / self.max_queue, 0, 1)
+        
+        avg_wait = np.zeros(4)
+        for i in range(4):
+            if self.raw_queue[i] > 0:
+                avg_wait[i] = self.raw_wait_total[i] / self.raw_queue[i]
+        
+        norm_avg_w = np.clip(avg_wait / self.max_avg_wait, 0, 1)
+        norm_max_w = np.clip(self.raw_wait_max / self.max_max_wait, 0, 1)
+        
+        # One-hot signal state
+        signal_state = np.zeros(4)
+        signal_state[self.current_signal] = 1.0
+        
+        state = np.concatenate((norm_q, norm_avg_w, norm_max_w, signal_state)).astype(np.float32)
+        return state
 
     def step(self, action):
-        if self.simulation:
-            # step the simulation with the given action
-            # e.g., self.simulation.apply_action(action)
-            # self.simulation.step()
-            # self.state = self.simulation.get_state()
-            pass
+        # 1. Traffic Dynamics
+        arrivals = np.random.poisson(0.7, size=(4,)) 
+        self.raw_queue += arrivals
+        
+        # Increment wait times
+        for i in range(4):
+            if self.raw_queue[i] > 0:
+                self.raw_wait_total[i] += self.raw_queue[i] * 1.0
+                self.raw_wait_max[i] += 1.0
+        
+        # 2. Transition Logic (Yellow Light)
+        if action != self.current_signal:
+            self.switching_timer = 3 
+            self.current_signal = action
             
-        # Interpret action
-        # 0 = North, 1 = South, 2 = East, 3 = West
-        queue = self.state[0:4].copy()
-        wait = self.state[4:8].copy()
+        cleared = 0
+        if self.switching_timer > 0:
+            self.switching_timer -= 1
+        else:
+            # 3. Apply Green Signal
+            cleared = np.random.randint(3, 7) 
+            actual_cleared = min(self.raw_queue[self.current_signal], cleared)
+            self.raw_queue[self.current_signal] -= actual_cleared
+            
+            if self.raw_queue[self.current_signal] == 0:
+                self.raw_wait_total[self.current_signal] = 0
+                self.raw_wait_max[self.current_signal] = 0
+            else:
+                self.raw_wait_total[self.current_signal] *= 0.5
+            
+        # 4. Reward Calculation
+        # HEAVY focus on fairness and clearing long waits
+        reward = (cleared * 25.0)
+        reward -= np.sum(self.raw_queue) * 2.0
+        reward -= np.sum(np.square(self.raw_wait_max / 30.0)) * 5.0 # Quadratic penalty for starvation!
         
-        # Apply traffic dynamics: Add incoming vehicles
-        queue += np.random.uniform(0.5, 1.5, size=(4,))
-        wait += np.random.uniform(0.5, 1.5, size=(4,))
+        if self.switching_timer > 0:
+            reward -= 60.0
         
-        # Apply green signal effect
-        queue[action] -= 2.0
-        wait[action] -= 1.0
-        
-        # Clip values to >= 0
-        queue = np.clip(queue, 0, None)
-        wait = np.clip(wait, 0, None)
-        
-        # Compute density
-        density = queue / 20.0
-        
-        # Update state
-        self.state = np.concatenate((queue, wait, density)).astype(np.float32)
-        
-        # Reward is negative total waiting time of all directions
-        reward = -float(np.sum(wait))
-        
-        terminated = False
+        terminated = bool(np.any(self.raw_queue > 60))
         truncated = False
-        info = {}
         
-        return self.state, reward, terminated, truncated, info
+        return self._get_normalized_state(), float(reward), terminated, truncated, {}
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        
-        if self.simulation:
-            # self.simulation.reset()
-            # self.state = self.simulation.get_state()
-            pass
-            
-        self.state = np.random.uniform(0, 10, size=(12,)).astype(np.float32)
-        info = {}
-        return self.state, info
+        self.raw_queue = np.random.uniform(0, 15, size=(4,))
+        self.raw_wait_total = self.raw_queue * np.random.uniform(0, 10, size=(4,))
+        self.raw_wait_max = np.random.uniform(0, 30, size=(4,))
+        self.current_signal = np.random.randint(0, 4)
+        self.switching_timer = 0
+        return self._get_normalized_state(), {}

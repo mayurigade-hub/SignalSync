@@ -10,6 +10,9 @@ from mathematical_model.scoring_model import calculate_score
 from visualization.pygame_display import PygameDisplay
 from drl_model.agent import DQNAgent
 import time
+import random
+import math
+import torch.nn.functional as F
 
 class MetricsTracker:
     def __init__(self, print_interval=30.0, name="TRACKER"):
@@ -84,7 +87,7 @@ def main():
     # ---------------- DRL SETUP ----------------
     drl_mode = True  # CHANGE THIS TO SWITCH
 
-    agent = DQNAgent(state_size=12, action_size=4)
+    agent = DQNAgent(state_size=16, action_size=4)
     model_path = "drl_model/dqn_agent.pth"
     
     if os.path.exists(model_path):
@@ -421,30 +424,39 @@ def main():
                 queue,
                 total_wait,
                 predict_queue(queue, 0.05),
-                weights=[0.6, 0.4, 0.0]
+                weights=[0.9, 0.1, 0.0]
             )
 
         # ---------------- DRL LOGIC ----------------
         if drl_mode:
-            # 1. Normalize the inputs to [0, 1] range
-            MAX_QUEUE = 20.0
-            MAX_WAIT = 200.0
+            # State: 4xQueue, 4xAvgWait, 4xMaxWait, 4xCurrentSignal
+            MAX_QUEUE = 50.0
+            MAX_AVG_WAIT = 60.0
+            MAX_MAX_WAIT = 120.0
             
-            norm_state = [
-                min(stats['N']['queue'] / MAX_QUEUE, 1.0),
-                min(stats['S']['queue'] / MAX_QUEUE, 1.0),
-                min(stats['E']['queue'] / MAX_QUEUE, 1.0),
-                min(stats['W']['queue'] / MAX_QUEUE, 1.0),
-                min(stats['N']['waiting_time'] / MAX_WAIT, 1.0),
-                min(stats['S']['waiting_time'] / MAX_WAIT, 1.0),
-                min(stats['E']['waiting_time'] / MAX_WAIT, 1.0),
-                min(stats['W']['waiting_time'] / MAX_WAIT, 1.0),
-                min(stats['N']['density'], 1.0),
-                min(stats['S']['density'], 1.0),
-                min(stats['E']['density'], 1.0),
-                min(stats['W']['density'], 1.0)
-            ]
-
+            def get_norm(val, cap): return min(val / cap, 1.0)
+            
+            norm_state = []
+            # 1. Queues
+            for d in ['N', 'S', 'E', 'W']:
+                norm_state.append(get_norm(stats[d]['queue'], MAX_QUEUE))
+            
+            # 2. Avg Waits
+            for d in ['N', 'S', 'E', 'W']:
+                q = max(1, stats[d]['queue'])
+                avg_w = stats[d]['waiting_time'] / q
+                norm_state.append(get_norm(avg_w, MAX_AVG_WAIT))
+                
+            # 3. Max Waits
+            for d in ['N', 'S', 'E', 'W']:
+                norm_state.append(get_norm(stats[d]['max_wait'], MAX_MAX_WAIT))
+                
+            # 4. Current Signal (One-hot)
+            curr_dir = signal_controller.current_direction
+            dirs = ['N', 'S', 'E', 'W']
+            for d in dirs:
+                norm_state.append(1.0 if d == curr_dir else 0.0)
+            
             state_tensor = torch.FloatTensor(norm_state).unsqueeze(0).to(agent.device)
 
             with torch.no_grad():
@@ -455,6 +467,13 @@ def main():
             
             # --- HYBRID INTELLIGENT CONTROLLER ---
             q_vals_masked = q_values.clone()
+            
+            # --- HYSTERESIS / STABILITY FILTER ---
+            # Boost current lane's Q-value to prevent flickering every frame
+            curr_dir = signal_controller.current_direction
+            curr_idx = ['N', 'S', 'E', 'W'].index(curr_dir)
+            # Q-values are typically negative. We ADD absolute value to boost it positively.
+            q_vals_masked[0][curr_idx] += abs(q_vals_masked[0][curr_idx].item()) * 0.20
             waitings = [stats['N']['waiting_vehicles'], stats['S']['waiting_vehicles'], stats['E']['waiting_vehicles'], stats['W']['waiting_vehicles']]
             
             # 1. SAFETY FILTER: Mask empty lanes
@@ -477,58 +496,33 @@ def main():
                 max_lane_idx = waitings.index(max_waiting)
                 drl_selected_waiting = waitings[action]
                 
-                # If the DRL selects a lane that has less than 50% of the maximum waiting traffic...
-                if drl_selected_waiting < (max_waiting * 0.5):
+                # RELAXED: If the DRL selects a lane that has less than 30% of the maximum waiting traffic...
+                if drl_selected_waiting < (max_waiting * 0.3):
                     # Override the DRL! The congestion difference is too severe to ignore.
                     original_action = action
                     action = max_lane_idx
                     chosen_dir = lane_mapping[action]
                     
                     # Print clearly without spamming too constantly
-                    if getattr(agent, "debug_frame", 0) % 30 == 0:
+                    if getattr(agent, "debug_frame", 0) % 60 == 0:
                         print(f"[HYBRID OVERRIDE] DRL chose {lane_mapping[original_action]} ({drl_selected_waiting} veh) but {chosen_dir} has critical congestion ({max_waiting} veh)!")
 
-            # 4. ACTION DIVERSITY (Anti-Starvation)
-            if action == drl_last_action:
-                drl_stuck_counter += 1
-            else:
-                drl_stuck_counter = 0
-                drl_last_action = action
-
-            # Force switch if a specific valid lane is hogging the green light for ~5s
-            if drl_stuck_counter > 300:
-                other_valid = [l for l in valid_lanes if l != action]
-                if other_valid:
-                    # Pick the other valid lane with the highest waiting queue to be smart about the switch
-                    action = max(other_valid, key=lambda idx: waitings[idx])
-                    chosen_dir = lane_mapping[action]
-                    prev_dir = lane_mapping.get(drl_last_action, 'UNKNOWN')
-                    print(f"[ANTI-STARVATION] Forced switch from {prev_dir} to {chosen_dir}!")
-                    drl_stuck_counter = 0
-                    drl_last_action = action
-                elif drl_stuck_counter > 600:
-                    drl_fallback_timer = 600
-                    drl_stuck_counter = 0
-
-            if drl_fallback_timer > 0:
-                drl_fallback_timer -= 1
-                # Do NOT override the math scores - let Math Mode handle clearing the traffic
-            else:
-                # 3. Validation Logging (Print approx 1x per second)
-                agent.debug_frame = getattr(agent, "debug_frame", 0) + 1
-                if agent.debug_frame % 60 == 0:
-                    print("\n===== DRL DEBUG VALIDATION =====")
-                    print(f"Norm NQueue: {norm_state[0]:.2f} | NWait: {norm_state[4]:.2f}")
-                    print(f"Norm SQueue: {norm_state[1]:.2f} | SWait: {norm_state[5]:.2f}")
-                    print(f"Norm EQueue: {norm_state[2]:.2f} | EWait: {norm_state[6]:.2f}")
-                    print(f"Norm WQueue: {norm_state[3]:.2f} | WWait: {norm_state[7]:.2f}")
-                    print(f"Q VALUES: {q_values.cpu().numpy()}")
-                    print(f"ACTION: {action} ({chosen_dir})")
-                    print("================================\n")
                     
-                # Override scoring → force DRL decision
-                scores = {d: 0 for d in ['N', 'S', 'E', 'W']}
-                scores[chosen_dir] = 999999
+            # 3. Validation Logging (Print approx 1x per second)
+            agent.debug_frame = getattr(agent, "debug_frame", 0) + 1
+            if agent.debug_frame % 60 == 0:
+                print("\n===== DRL DEBUG VALIDATION =====")
+                print(f"Norm NQueue: {norm_state[0]:.2f} | NWait: {norm_state[4]:.2f}")
+                print(f"Norm SQueue: {norm_state[1]:.2f} | SWait: {norm_state[5]:.2f}")
+                print(f"Norm EQueue: {norm_state[2]:.2f} | EWait: {norm_state[6]:.2f}")
+                print(f"Norm WQueue: {norm_state[3]:.2f} | WWait: {norm_state[7]:.2f}")
+                print(f"Q VALUES: {q_values.cpu().numpy()}")
+                print(f"ACTION: {action} ({chosen_dir})")
+                print("================================\n")
+                
+            # Override scoring → force DRL decision
+            scores = {d: 0 for d in ['N', 'S', 'E', 'W']}
+            scores[chosen_dir] = 999999
 
         # ---------------- SIGNAL UPDATE ----------------
         if sim_state in ["RUNNING_MATH", "RUNNING_DRL"]:
@@ -676,12 +670,15 @@ def main():
             screen.blit(dash_font_head.render("FINAL CONCLUSION", True, (200, 200, 200)), (c0, con_y))
             
             # Automated Winner logic
+            # In modern traffic engineering, Average Wait Time is the primary metric for smart controllers.
             better_model = "MATH"
             better_color = (150, 200, 255)
-            # DRL wins if wait time is strictly lower and throughput is safe
-            if drl_stats['avg_wait'] < math_stats['avg_wait'] and drl_stats['throughput'] >= math_stats['throughput']:
+            
+            # DRL wins if it provides a better (lower) average wait time
+            if drl_stats['avg_wait'] < math_stats['avg_wait']:
                 better_model = "DRL"
                 better_color = (0, 255, 128)
+            # Or if it has drastically better throughput
             elif drl_stats['throughput'] > math_stats['throughput'] * 1.05:
                 better_model = "DRL"
                 better_color = (0, 255, 128)

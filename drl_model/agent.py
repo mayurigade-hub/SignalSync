@@ -9,11 +9,11 @@ class QNetwork(nn.Module):
     """Multi-Layer Perceptron representing the Q-Network."""
     def __init__(self, state_size, action_size):
         super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_size, 64)
+        self.fc1 = nn.Linear(state_size, 256)
         self.relu1 = nn.ReLU()
-        self.fc2 = nn.Linear(64, 64)
+        self.fc2 = nn.Linear(256, 256)
         self.relu2 = nn.ReLU()
-        self.fc3 = nn.Linear(64, action_size)
+        self.fc3 = nn.Linear(256, action_size)
 
     def forward(self, x):
         x = self.relu1(self.fc1(x))
@@ -22,9 +22,9 @@ class QNetwork(nn.Module):
 
 class DQNAgent:
     """Deep Q-Network Agent for Traffic Light Control."""
-    def __init__(self, state_size=3, action_size=4, lr=1e-3, gamma=0.99, 
+    def __init__(self, state_size=16, action_size=4, lr=2e-4, gamma=0.99, 
                  epsilon_start=1.0, epsilon_end=0.01, epsilon_decay=0.995, 
-                 buffer_size=10000, batch_size=64):
+                 buffer_size=50000, batch_size=128):
         self.state_size = state_size
         self.action_size = action_size
         self.gamma = gamma

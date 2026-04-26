@@ -9,13 +9,13 @@ def train():
     """Main training loop for the DQN Agent interacting with the TrafficEnv."""
     env = TrafficEnv()
     
-    state_size = 12
+    state_size = 16
     action_size = int(env.action_space.n)
-    agent = DQNAgent(state_size=state_size, action_size=action_size)
+    agent = DQNAgent(state_size=state_size, action_size=action_size, lr=2e-4)
     
-    num_episodes = 200
+    num_episodes = 2500
     max_steps = 100
-    target_update_freq = 10
+    target_update_freq = 20
     
     rewards_history = []
     
@@ -45,14 +45,13 @@ def train():
             agent.update_target_network()
             
         rewards_history.append(episode_reward)
-        if episode % 10 == 0:
+        if episode % 50 == 0:
             print(f"Episode: {episode}/{num_episodes}, Reward: {episode_reward:.2f}, Epsilon: {agent.epsilon:.3f}")
             
     print("Training Completed.")
     
-    # Ensure directory exists for saving the model
-    os.makedirs("models", exist_ok=True)
-    model_path = os.path.join("models", "dqn_agent.pth")
+    # Save the model directly into drl_model for main.py to find
+    model_path = os.path.join("drl_model", "dqn_agent.pth")
     torch.save(agent.q_network.state_dict(), model_path)
     print(f"Model saved to {model_path}")
     
