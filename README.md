@@ -183,7 +183,7 @@ SignalSync/
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/SignalSync.git
+git clone https://github.com/mayurigade-hub/SignalSync.git
 cd SignalSync
 
 # 2. Create and activate a virtual environment
