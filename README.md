@@ -178,6 +178,9 @@ SignalSync/
 ### Prerequisites
 
 - Python `3.10+`
+- A desktop environment with display support (Windows / macOS / Linux with GUI)
+
+> ⚠️ Does not run on Android (Termux) or headless Linux servers — Pygame requires SDL display rendering.
 
 ### Setup
 
